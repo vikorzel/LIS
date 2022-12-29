@@ -59,6 +59,10 @@ func TestInstance(t *testing.T) {
 	}
 }
 
+func TestSchedule(t *testing.T) {
+	
+}
+
 func sendError(w http.ResponseWriter) {
 	w.WriteHeader(403)
 	resp := make(map[string]string)
