@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"io/ioutil"
 	"net/http"
+	"net/http/httptest"
 	"testing"
 )
 
@@ -16,12 +17,45 @@ func TestSay(t *testing.T) {
 }
 
 func TestInstance(t *testing.T) {
-	http.HandleFunc("/sessions", sessionsHandler)
-	http.ListenAndServe("localhost:33322", nil)
-	ep_test := "http://localhost"
-	inst := lis.NewInstance("http://localhost")
+	testsrvr := httptest.NewServer(
+		http.HandlerFunc(mainHandler),
+	)
+	ep_test := testsrvr.URL
+
+	defer testsrvr.Close()
+
+	inst := lis.NewInstance(ep_test, "wrong_user", "wrong_password", "wrong_group")
 	if inst.GetEndpoint() != ep_test {
 		t.Errorf("Wrong Enpoint")
+	}
+	err := inst.Authorise()
+	if err != nil && err.Error() != "wrong credentials for wrong_user" {
+		t.Errorf("Authorisation is not working (1)")
+	}
+
+	err = lis.NewInstance(ep_test, "wrong_user", "TEST", "TEST").Authorise()
+
+	if err != nil && err.Error() != "wrong credentials for wrong_user" {
+		t.Errorf("Authorisation is not working (2)")
+	}
+
+	inst = lis.NewInstance(
+		ep_test,
+		"TEST",
+		"TEST",
+		"TEST",
+	)
+	err = inst.Authorise()
+	if err != nil {
+		t.Errorf("Authorisation is not working (3): %s", err.Error())
+	}
+
+	if inst.GetUserId() != 123 {
+		t.Errorf("Wrong User ID: %d vs 123", inst.GetUserId())
+	}
+
+	if inst.GetGroupId() != 1234 {
+		t.Errorf("Wrong Group ID: %d vs 1234", inst.GetUserId())
 	}
 }
 
@@ -87,4 +121,11 @@ func sessionsHandler(w http.ResponseWriter, r *http.Request) {
 		setSessionCookie(&w, ".session1")
 		w.Write(resp_text)
 	}
+}
+
+func mainHandler(w http.ResponseWriter, r *http.Request) {
+	if r.RequestURI == "/sessions" {
+		sessionsHandler(w, r)
+	}
+
 }
