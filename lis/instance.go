@@ -14,11 +14,11 @@ import (
 
 type instance struct {
 	endpoint  string
-	userid    uint64
+	userID    uint64
 	username  string
 	password  string
 	groupname string
-	groupId   uint64
+	groupID   uint64
 	cookie    *cookiejar.Jar
 	http_cli  *http.Client
 	faketime  *string
@@ -30,6 +30,7 @@ func NewInstance(endpoint string, username string, password string, groupname st
 		username:  username,
 		password:  password,
 		groupname: groupname,
+		userID:    0,
 	}
 	cookiejar, err := cookiejar.New(
 		&cookiejar.Options{
@@ -53,15 +54,18 @@ func (inst *instance) SetFaketime(new_time string) {
 }
 
 func (inst *instance) GetFakeTime() string {
-	return *(inst.faketime)
+	if inst.faketime != nil {
+		return *(inst.faketime)
+	}
+	return ""
 }
 
 func (inst *instance) GetGroupId() uint64 {
-	return inst.groupId
+	return inst.groupID
 }
 
 func (inst *instance) GetUserId() uint64 {
-	return inst.userid
+	return inst.userID
 }
 
 func (inst *instance) initClient() error {
@@ -74,23 +78,32 @@ func (inst *instance) initClient() error {
 	return nil
 }
 
-func getSessions(inst *instance) (int, error) {
+func Get(inst *instance, handler string) (int, *http.Response, error) {
+	log.Printf("try to get %s", handler)
 	inst.initClient()
 	req, err := http.NewRequest(
 		"GET",
-		fmt.Sprintf("%s/sessions", inst.endpoint),
+		fmt.Sprintf("%s/%s", inst.endpoint, handler),
 		nil,
 	)
 	if err != nil {
-		return 0, err
+		log.Printf("error with request: %s", err.Error())
+		return 0, nil, err
 	}
 	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.36")
 	resp, err := inst.http_cli.Do(req)
 	if resp != nil {
-		return resp.StatusCode, err
+		log.Printf("Received response (%d)", resp.StatusCode)
+		return resp.StatusCode, resp, err
 	}
-	return 0, err
+	log.Printf("Data sending failed: %s", err.Error())
+	return 0, nil, err
 
+}
+
+func getSessions(inst *instance) (int, error) {
+	code, _, err := Get(inst, "sessions")
+	return code, err
 }
 
 func postSessions(inst *instance) (int, *http.Response, error) {
@@ -133,10 +146,10 @@ func (inst *instance) Authorise() error {
 		if err != nil {
 			return err
 		}
-		session := Session{}
+		session := SessionResonse{}
 		json.Unmarshal(body, &session)
-		inst.groupId = session.GroupId
-		inst.userid = session.UserId
+		inst.groupID = session.GroupID
+		inst.userID = session.UserID
 
 	}
 	code, err := getSessions(inst)
