@@ -59,11 +59,11 @@ type Group struct {
 	Timezone                   string `json:"timezone"`
 }
 
-type Session struct {
-	GroupID   int    `json:"group_id"`
+type SessionResonse struct {
+	GroupID   uint64 `json:"group_id"`
 	ID        string `json:"id"`
 	LastLogin string `json:"last_login"`
-	UserID    int    `json:"user_id"`
+	UserID    uint64 `json:"user_id"`
 }
 
 type BookedTimeSlot struct {
