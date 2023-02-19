@@ -17,6 +17,21 @@ type Schedule struct {
 	session   *instance
 }
 
+type timeTableCell struct {
+	time   string
+	booked bool
+}
+
+type timeTableDay struct {
+	day   string
+	cells []timeTableCell
+}
+
+type timeTable struct {
+	name string
+	days []timeTableDay
+}
+
 func NewSchedule(session *instance) (*Schedule, error) {
 	if session == nil {
 		return nil, errors.New("bad session pointer")
@@ -36,6 +51,23 @@ func (sched *Schedule) Refresh() error {
 	sched.timeSlots = sched.getTimeSlots()
 	sched.bookings = sched.getBookings()
 	return nil
+}
+
+func (sched *Schedule) RenderSchedule() {
+	resources_cnt := 0
+	for _, resource := range sched.resources {
+		if resource.PrimaryFlag {
+			resources_cnt++
+		}
+	}
+	schedule := make([]timeTable, resources_cnt)
+	for _, resource := range sched.resources {
+		if resource.PrimaryFlag {
+			schedule[resources_cnt-1].name = resource.Description
+			resources_cnt--
+		}
+
+	}
 }
 
 func (sched *Schedule) getter(resname string, mapobj interface{}) error {
