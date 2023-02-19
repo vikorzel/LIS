@@ -1,0 +1,3 @@
+*.code-workspace
+.vscode/
+lis/test/__debug_bin

@@ -29,6 +29,7 @@ type timeTableDay struct {
 
 type timeTable struct {
 	name string
+	id   int
 	days []timeTableDay
 }
 
@@ -64,10 +65,61 @@ func (sched *Schedule) RenderSchedule() {
 	for _, resource := range sched.resources {
 		if resource.PrimaryFlag {
 			schedule[resources_cnt-1].name = resource.Description
+			schedule[resources_cnt-1].id = resource.ID
 			resources_cnt--
 		}
 
 	}
+
+	bookedMask := make(map[string]bool)
+
+	for _, booking := range sched.bookings {
+		mask := fmt.Sprintf("%d:%d", booking.ResourceID, booking.BookedTimeSlotID)
+		bookedMask[mask] = true
+	}
+
+	for index, res := range schedule {
+		schedule[index].days = make([]timeTableDay, 7)
+		schedule[index].days[0].day = "Sun"
+		schedule[index].days[0].cells = make([]timeTableCell, 0)
+
+		schedule[index].days[1].day = "Mon"
+		schedule[index].days[1].cells = make([]timeTableCell, 0)
+
+		schedule[index].days[2].day = "Tue"
+		schedule[index].days[2].cells = make([]timeTableCell, 0)
+
+		schedule[index].days[3].day = "Wed"
+		schedule[index].days[3].cells = make([]timeTableCell, 0)
+
+		schedule[index].days[4].day = "Thu"
+		schedule[index].days[4].cells = make([]timeTableCell, 0)
+
+		schedule[index].days[5].day = "Fri"
+		schedule[index].days[5].cells = make([]timeTableCell, 0)
+
+		schedule[index].days[6].day = "Sat"
+		schedule[index].days[6].cells = make([]timeTableCell, 0)
+
+		for _, time_slot := range sched.timeSlots {
+			mask := fmt.Sprintf("%d:%d", res.id, time_slot.ID)
+			_, ok := bookedMask[mask]
+			if ok {
+				schedule[index].days[time_slot.DayOfWeek-1].cells = append(schedule[index].days[time_slot.DayOfWeek-1].cells, timeTableCell{
+					time:   time_slot.Description,
+					booked: true,
+				})
+			} else {
+				schedule[index].days[time_slot.DayOfWeek-1].cells = append(schedule[index].days[time_slot.DayOfWeek-1].cells, timeTableCell{
+					time:   time_slot.Description,
+					booked: false,
+				})
+			}
+		}
+	}
+
+	// TODO: booked_time_slot_id is not ID of time_slot, so, at first we need to request booked_time_slots and find there time_slot_id
+
 }
 
 func (sched *Schedule) getter(resname string, mapobj interface{}) error {
