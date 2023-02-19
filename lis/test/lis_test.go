@@ -89,6 +89,9 @@ func TestSchedule(t *testing.T) {
 	if len(resources) < 1 {
 		t.Errorf("Didn't receieved resources information")
 	}
+	sched.RenderSchedule()
+	t.Errorf("The end")
+
 }
 
 func sendError(w http.ResponseWriter) {
