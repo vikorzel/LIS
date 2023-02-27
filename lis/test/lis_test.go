@@ -89,8 +89,61 @@ func TestSchedule(t *testing.T) {
 	if len(resources) < 1 {
 		t.Errorf("Didn't receieved resources information")
 	}
-	sched.RenderSchedule()
-	t.Errorf("The end")
+	schedule := sched.RenderSchedule()
+	for _, timeTable := range schedule {
+		for _, day := range timeTable.Days {
+			for _, cell := range day.Cells {
+				if cell.Time == "9am - 11:30pm" && day.Day == "Sun" && timeTable.Name == "Cessna 172" {
+					if cell.Booked == false {
+						t.Errorf("res: %s , day: %s, time: %s should be occupaied", timeTable.Name, day.Day, cell.Time)
+					}
+				} else {
+					if cell.Booked == true {
+						t.Errorf("res: %s , day: %s, time: %s should be free", timeTable.Name, day.Day, cell.Time)
+					}
+				}
+			}
+		}
+	}
+}
+
+func testBooking(t *testing.T) {
+	testsrvr := httptest.NewServer(
+		http.HandlerFunc(mainHandler),
+	)
+	instance := lis.NewInstance(
+		testsrvr.URL,
+		"TEST",
+		"TEST",
+		"TEST",
+	)
+
+	_, err := lis.NewSchedule(nil)
+	if err == nil || err.Error() != "bad session pointer" {
+		t.Errorf("Session pointer for schedule is not checked")
+	}
+
+	_, err = lis.NewSchedule(instance)
+	if err == nil || err.Error() != "not authorised session" {
+		t.Errorf("Session auth is not checked for the schedule credentials")
+	}
+
+	err = instance.Authorise()
+	if err != nil {
+		t.Error("Auth credentials is not valid for the end user")
+	}
+
+	sched, err := lis.NewSchedule(instance)
+	if err != nil {
+		t.Errorf("Can not create schedule obj with err: %s", err.Error())
+	}
+
+	instance.SetFaketime("2022-11-29")
+	sched.Refresh()
+	resources := sched.GetResources()
+	if len(resources) < 1 {
+		t.Errorf("Didn't receieved resources information")
+	}
 
 }
 
@@ -183,7 +236,14 @@ func timeSlotsHandler(w http.ResponseWriter, r *http.Request) {
 func bookingHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.Write(
-		[]byte("{\n  \"bookings\": [\n    {\n      \"block_uuid\": null, \n      \"booked_by_user_id\": 360847, \n      \"booked_time_slot_id\": 7805732, \n      \"booked_when\": \"2022-11-29 00:00:00\", \n      \"description\": \"1234\", \n      \"id\": 11764275, \n      \"primary_booking_id\": null, \n      \"resource_id\": 77787, \n      \"secondary_bookings\": []\n    }\n  ]\n}\n"),
+		[]byte("{\n  \"bookings\": [\n    {\n      \"block_uuid\": null, \n      \"booked_by_user_id\": 360847, \n      \"booked_time_slot_id\": 7805733, \n      \"booked_when\": \"2022-11-29 00:00:00\", \n      \"description\": \"1234\", \n      \"id\": 11764275, \n      \"primary_booking_id\": null, \n      \"resource_id\": 77787, \n      \"secondary_bookings\": []\n    }\n  ]\n}\n"),
+	)
+}
+
+func bookedTimeSlotHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.Write(
+		[]byte("{\"booked_time_slots\": [{\n  \"booking_date\": \"2022-12-04\", \n  \"group_id\": 19618, \n  \"id\": 7805733, \n  \"time_slot_id\": 759174\n}]\n}"),
 	)
 }
 
@@ -198,6 +258,8 @@ func mainHandler(w http.ResponseWriter, r *http.Request) {
 		timeSlotsHandler(w, r)
 	} else if r.RequestURI == "/bookings/week/2022/11/29" {
 		bookingHandler(w, r)
+	} else if r.RequestURI == "/booked_time_slots/week/2022/11/29" {
+		bookedTimeSlotHandler(w, r)
 	} else {
 		w.WriteHeader(404)
 	}
