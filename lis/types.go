@@ -5,7 +5,7 @@ type Session struct {
 	Id        string  `json:"id"`
 	LastLogin string  `json:"last_login"`
 	UserId    uint64  `json:"user_id"`
-	Password  *string `json:password,omitempty`
+	Password  *string `json:"password,omitempty"`
 }
 
 type SessionRequest struct {

@@ -10,27 +10,31 @@ import (
 )
 
 type Schedule struct {
-	resources []Resource
-	users     []User
-	timeSlots []TimeSlot
-	bookings  []Boooking
-	session   *instance
+	resources         []Resource
+	users             []User
+	timeSlots         []TimeSlot
+	bookings          []Boooking
+	booked_time_slots []BookedTimeSlot
+	session           *instance
+	bts2ts            map[int]int
+	renderedData      []TimeTable
 }
 
-type timeTableCell struct {
-	time   string
-	booked bool
+type TimeTableCell struct {
+	Time   string
+	Booked bool
+	ID     int
 }
 
-type timeTableDay struct {
-	day   string
-	cells []timeTableCell
+type TimeTableDay struct {
+	Day   string
+	Cells []TimeTableCell
 }
 
-type timeTable struct {
-	name string
-	id   int
-	days []timeTableDay
+type TimeTable struct {
+	Name string
+	ID   int
+	Days []TimeTableDay
 }
 
 func NewSchedule(session *instance) (*Schedule, error) {
@@ -46,26 +50,36 @@ func NewSchedule(session *instance) (*Schedule, error) {
 	return &sch, nil
 }
 
+func (sched *Schedule) makeBTS2TSMap() {
+	sched.bts2ts = make(map[int]int)
+	for _, booked_time_slot := range sched.booked_time_slots {
+		sched.bts2ts[booked_time_slot.ID] = booked_time_slot.TimeSlotID
+	}
+}
+
 func (sched *Schedule) Refresh() error {
 	sched.users = sched.getUsers()
 	sched.resources = sched.getResources()
 	sched.timeSlots = sched.getTimeSlots()
 	sched.bookings = sched.getBookings()
+	sched.booked_time_slots = sched.getBookedTimeSlots()
+
+	sched.makeBTS2TSMap()
 	return nil
 }
 
-func (sched *Schedule) RenderSchedule() {
+func (sched *Schedule) RenderSchedule() []TimeTable {
 	resources_cnt := 0
 	for _, resource := range sched.resources {
 		if resource.PrimaryFlag {
 			resources_cnt++
 		}
 	}
-	schedule := make([]timeTable, resources_cnt)
+	schedule := make([]TimeTable, resources_cnt)
 	for _, resource := range sched.resources {
 		if resource.PrimaryFlag {
-			schedule[resources_cnt-1].name = resource.Description
-			schedule[resources_cnt-1].id = resource.ID
+			schedule[resources_cnt-1].Name = resource.Description
+			schedule[resources_cnt-1].ID = resource.ID
 			resources_cnt--
 		}
 
@@ -74,52 +88,86 @@ func (sched *Schedule) RenderSchedule() {
 	bookedMask := make(map[string]bool)
 
 	for _, booking := range sched.bookings {
-		mask := fmt.Sprintf("%d:%d", booking.ResourceID, booking.BookedTimeSlotID)
+		timeSlotID := sched.bts2ts[booking.BookedTimeSlotID]
+		mask := fmt.Sprintf("%d:%d", booking.ResourceID, timeSlotID)
 		bookedMask[mask] = true
 	}
 
 	for index, res := range schedule {
-		schedule[index].days = make([]timeTableDay, 7)
-		schedule[index].days[0].day = "Sun"
-		schedule[index].days[0].cells = make([]timeTableCell, 0)
+		schedule[index].Days = make([]TimeTableDay, 7)
+		schedule[index].Days[0].Day = "Sun"
+		schedule[index].Days[0].Cells = make([]TimeTableCell, 0)
 
-		schedule[index].days[1].day = "Mon"
-		schedule[index].days[1].cells = make([]timeTableCell, 0)
+		schedule[index].Days[1].Day = "Mon"
+		schedule[index].Days[1].Cells = make([]TimeTableCell, 0)
 
-		schedule[index].days[2].day = "Tue"
-		schedule[index].days[2].cells = make([]timeTableCell, 0)
+		schedule[index].Days[2].Day = "Tue"
+		schedule[index].Days[2].Cells = make([]TimeTableCell, 0)
 
-		schedule[index].days[3].day = "Wed"
-		schedule[index].days[3].cells = make([]timeTableCell, 0)
+		schedule[index].Days[3].Day = "Wed"
+		schedule[index].Days[3].Cells = make([]TimeTableCell, 0)
 
-		schedule[index].days[4].day = "Thu"
-		schedule[index].days[4].cells = make([]timeTableCell, 0)
+		schedule[index].Days[4].Day = "Thu"
+		schedule[index].Days[4].Cells = make([]TimeTableCell, 0)
 
-		schedule[index].days[5].day = "Fri"
-		schedule[index].days[5].cells = make([]timeTableCell, 0)
+		schedule[index].Days[5].Day = "Fri"
+		schedule[index].Days[5].Cells = make([]TimeTableCell, 0)
 
-		schedule[index].days[6].day = "Sat"
-		schedule[index].days[6].cells = make([]timeTableCell, 0)
+		schedule[index].Days[6].Day = "Sat"
+		schedule[index].Days[6].Cells = make([]TimeTableCell, 0)
 
 		for _, time_slot := range sched.timeSlots {
-			mask := fmt.Sprintf("%d:%d", res.id, time_slot.ID)
+			mask := fmt.Sprintf("%d:%d", res.ID, time_slot.ID)
 			_, ok := bookedMask[mask]
 			if ok {
-				schedule[index].days[time_slot.DayOfWeek-1].cells = append(schedule[index].days[time_slot.DayOfWeek-1].cells, timeTableCell{
-					time:   time_slot.Description,
-					booked: true,
+				schedule[index].Days[time_slot.DayOfWeek-1].Cells = append(schedule[index].Days[time_slot.DayOfWeek-1].Cells, TimeTableCell{
+					Time:   time_slot.Description,
+					Booked: true,
+					ID:     time_slot.ID,
 				})
 			} else {
-				schedule[index].days[time_slot.DayOfWeek-1].cells = append(schedule[index].days[time_slot.DayOfWeek-1].cells, timeTableCell{
-					time:   time_slot.Description,
-					booked: false,
+				schedule[index].Days[time_slot.DayOfWeek-1].Cells = append(schedule[index].Days[time_slot.DayOfWeek-1].Cells, TimeTableCell{
+					Time:   time_slot.Description,
+					Booked: false,
+					ID:     time_slot.ID,
 				})
 			}
 		}
 	}
 
+	sched.renderedData = schedule
+	return schedule
 	// TODO: booked_time_slot_id is not ID of time_slot, so, at first we need to request booked_time_slots and find there time_slot_id
+}
 
+func (sched *Schedule) bookTimeSlot(timeSlotID int, resourceID int) bool {
+	// POST https://www.e-allocator.com/api/v1/booked_time_slots {time_slot_id: 759170, booking_date: "2022-12-03"} <- {"booking_date": "2022-12-03", "group_id": 19618, "id": 7805732, "time_slot_id": 759170}
+	date := sched.session.getDate()
+	dateFormatedString := fmt.Sprintf("%d-%02d-%02d", date.Year(), date.Month(), date.Day())
+
+	request := BookingTimeSlotRequest{
+		TimeSlotID:  timeSlotID,
+		BookingDate: dateFormatedString,
+	}
+
+	// POST https://www.e-allocator.com/api/v1/bookings {"resource_id":77787,"description":"1234","booked_time_slot_id":7805732,"booked_by_user_id":360847,"booked_when":"2022-11-29","secondary_resource_ids":[],"ical":false}
+}
+
+func (sched *Schedule) BookIfPossible(day string, time string) *string {
+	if sched.renderedData == nil {
+		sched.RenderSchedule()
+	}
+	for _, resource := range sched.renderedData {
+		for _, dayCell := range resource.Days {
+			if dayCell.Day == day {
+				for _, timeCell := range dayCell.Cells {
+					if timeCell.Time == time && timeCell.Booked == false {
+						sched.bookTimeSlot(timeCell.ID, resource.ID)
+					}
+				}
+			}
+		}
+	}
 }
 
 func (sched *Schedule) getter(resname string, mapobj interface{}) error {
@@ -205,6 +253,20 @@ func (sched *Schedule) getDate() time.Time {
 		}
 	}
 	return tprocess
+}
+
+func (sched *Schedule) getBookedTimeSlots() []BookedTimeSlot {
+	type BookedTimeSlotResponse struct {
+		BookedTimeSlots []BookedTimeSlot `json:"booked_time_slots"`
+	}
+	var timeSlots BookedTimeSlotResponse
+	date := sched.getDate()
+	uri := fmt.Sprintf("booked_time_slots/week/%d/%02d/%02d", date.Year(), date.Month(), date.Day())
+	err := sched.getter(uri, &timeSlots)
+	if err != nil {
+		log.Fatalf("Can't get booked time slots: %s", err.Error())
+	}
+	return timeSlots.BookedTimeSlots
 }
 
 func (sched *Schedule) GetResources() []Resource {
