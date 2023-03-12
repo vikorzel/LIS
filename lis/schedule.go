@@ -140,17 +140,49 @@ func (sched *Schedule) RenderSchedule() []TimeTable {
 	// TODO: booked_time_slot_id is not ID of time_slot, so, at first we need to request booked_time_slots and find there time_slot_id
 }
 
-func (sched *Schedule) bookTimeSlot(timeSlotID int, resourceID int) bool {
-	// POST https://www.e-allocator.com/api/v1/booked_time_slots {time_slot_id: 759170, booking_date: "2022-12-03"} <- {"booking_date": "2022-12-03", "group_id": 19618, "id": 7805732, "time_slot_id": 759170}
-	date := sched.session.getDate()
+func (sched *Schedule) bookTimeSlot(timeSlotID int, resourceID int) int {
+	date := sched.getDate()
 	dateFormatedString := fmt.Sprintf("%d-%02d-%02d", date.Year(), date.Month(), date.Day())
 
-	request := BookingTimeSlotRequest{
+	timeSlotRequest := BookingTimeSlotRequest{
 		TimeSlotID:  timeSlotID,
 		BookingDate: dateFormatedString,
 	}
+	payload, err := json.Marshal(timeSlotRequest)
+	if err != nil {
+		log.Printf("Error with request marshaling: %s", err.Error())
+		return -1
+	}
+	var bookedTimeSlot BookingTimeSlotResponse
 
-	// POST https://www.e-allocator.com/api/v1/bookings {"resource_id":77787,"description":"1234","booked_time_slot_id":7805732,"booked_by_user_id":360847,"booked_when":"2022-11-29","secondary_resource_ids":[],"ical":false}
+	err = sched.poster("booked_time_slots", &payload, &bookedTimeSlot)
+	if err != nil {
+		return -1
+	}
+
+	bookingTimeSlotRequest := BookingRequest{
+		ResourceID:           resourceID,
+		Description:          "",
+		BookedTimeSlotID:     bookedTimeSlot.ID,
+		BookedByUserID:       int(sched.session.userID),
+		BookedWhen:           dateFormatedString,
+		SecondaryResourceIds: make([]interface{}, 0),
+		Ical:                 false,
+	}
+
+	payload, err = json.Marshal(bookingTimeSlotRequest)
+	if err != nil {
+		log.Printf("Error with request marshaling: %s", err.Error())
+		return -1
+	}
+	var bookingResponse BookingResponse
+
+	err = sched.poster("bookings", &payload, &bookingResponse)
+	if err != nil {
+		return -1
+	}
+
+	return bookingResponse.ID
 }
 
 func (sched *Schedule) BookIfPossible(day string, time string) *string {
@@ -162,12 +194,17 @@ func (sched *Schedule) BookIfPossible(day string, time string) *string {
 			if dayCell.Day == day {
 				for _, timeCell := range dayCell.Cells {
 					if timeCell.Time == time && timeCell.Booked == false {
-						sched.bookTimeSlot(timeCell.ID, resource.ID)
+						ret := sched.bookTimeSlot(timeCell.ID, resource.ID)
+						if ret == -1 {
+							return nil
+						}
+						return &resource.Name
 					}
 				}
 			}
 		}
 	}
+	return nil
 }
 
 func (sched *Schedule) getter(resname string, mapobj interface{}) error {
@@ -183,6 +220,24 @@ func (sched *Schedule) getter(resname string, mapobj interface{}) error {
 		return err
 	}
 	err = json.Unmarshal(body, mapobj)
+	if err != nil {
+		log.Printf("Failed on %s JSON unmarshaling: %s", resname, err.Error())
+		return err
+	}
+	return nil
+}
+
+func (sched *Schedule) poster(resname string, request_payload *[]byte, respobj interface{}) error {
+	_, resp, err := Post(sched.session, resname, request_payload)
+	if err != nil {
+		return err
+	}
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		log.Printf("Failed to read body of %s request: %s", resname, err.Error())
+		return err
+	}
+	err = json.Unmarshal(body, respobj)
 	if err != nil {
 		log.Printf("Failed on %s JSON unmarshaling: %s", resname, err.Error())
 		return err

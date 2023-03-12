@@ -107,7 +107,7 @@ func TestSchedule(t *testing.T) {
 	}
 }
 
-func testBooking(t *testing.T) {
+func TestBooking(t *testing.T) {
 	testsrvr := httptest.NewServer(
 		http.HandlerFunc(mainHandler),
 	)
@@ -143,6 +143,9 @@ func testBooking(t *testing.T) {
 	resources := sched.GetResources()
 	if len(resources) < 1 {
 		t.Errorf("Didn't receieved resources information")
+	}
+	if sched.BookIfPossible("Mon", "2pm - 7pm") == nil {
+		t.Errorf("Failed to book the room")
 	}
 
 }
@@ -247,6 +250,28 @@ func bookedTimeSlotHandler(w http.ResponseWriter, r *http.Request) {
 	)
 }
 
+func postBookingHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "POST" {
+		sendError(w)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Write(
+		[]byte("{\n  \"block_uuid\": null, \n  \"booked_by_user_id\": 360847, \n  \"booked_time_slot_id\": 7805732, \n  \"booked_when\": \"2022-11-29 00:00:00\", \n  \"description\": \"1234\", \n  \"id\": 11764275, \n  \"primary_booking_id\": null, \n  \"resource_id\": 77787, \n  \"secondary_bookings\": []\n}"),
+	)
+}
+
+func postBookedTimeSlotHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "POST" {
+		sendError(w)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Write(
+		[]byte("{\n  \"booking_date\": \"2022-12-03\", \n  \"group_id\": 19618, \n  \"id\": 7805732, \n  \"time_slot_id\": 759170\n}"),
+	)
+}
+
 func mainHandler(w http.ResponseWriter, r *http.Request) {
 	if r.RequestURI == "/sessions" {
 		sessionsHandler(w, r)
@@ -260,6 +285,10 @@ func mainHandler(w http.ResponseWriter, r *http.Request) {
 		bookingHandler(w, r)
 	} else if r.RequestURI == "/booked_time_slots/week/2022/11/29" {
 		bookedTimeSlotHandler(w, r)
+	} else if r.RequestURI == "/bookings" {
+		postBookingHandler(w, r)
+	} else if r.RequestURI == "/booked_time_slots" {
+		postBookedTimeSlotHandler(w, r)
 	} else {
 		w.WriteHeader(404)
 	}

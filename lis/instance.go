@@ -101,6 +101,34 @@ func Get(inst *instance, handler string) (int, *http.Response, error) {
 
 }
 
+func Post(inst *instance, handler string, payload *[]byte) (int, *http.Response, error) {
+	log.Printf("Try to post %s handler", handler)
+	inst.initClient()
+	var req *http.Request
+	var err error
+	var reader *bytes.Reader = nil
+	if payload != nil {
+		reader = bytes.NewReader(*payload)
+	}
+	req, err = http.NewRequest(
+		"POST",
+		fmt.Sprintf("%s/%s", inst.endpoint, handler),
+		reader,
+	)
+	if err != nil {
+		log.Printf("error with request building: %s", err.Error())
+		return 0, nil, err
+	}
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.36")
+	resp, err := inst.http_cli.Do(req)
+	if err != nil {
+		log.Printf("error with request sending: %s", err.Error())
+		return 0, nil, err
+	}
+	return resp.StatusCode, resp, err
+
+}
+
 func getSessions(inst *instance) (int, error) {
 	code, _, err := Get(inst, "sessions")
 	return code, err
