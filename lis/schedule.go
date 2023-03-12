@@ -140,7 +140,7 @@ func (sched *Schedule) RenderSchedule() []TimeTable {
 	// TODO: booked_time_slot_id is not ID of time_slot, so, at first we need to request booked_time_slots and find there time_slot_id
 }
 
-func (sched *Schedule) bookTimeSlot(timeSlotID int, resourceID int) int {
+func (sched *Schedule) bookTimeSlot(timeSlotID int, resourceID int, description string) int {
 	date := sched.getDate()
 	dateFormatedString := fmt.Sprintf("%d-%02d-%02d", date.Year(), date.Month(), date.Day())
 
@@ -162,7 +162,7 @@ func (sched *Schedule) bookTimeSlot(timeSlotID int, resourceID int) int {
 
 	bookingTimeSlotRequest := BookingRequest{
 		ResourceID:           resourceID,
-		Description:          "",
+		Description:          description,
 		BookedTimeSlotID:     bookedTimeSlot.ID,
 		BookedByUserID:       int(sched.session.userID),
 		BookedWhen:           dateFormatedString,
@@ -185,7 +185,7 @@ func (sched *Schedule) bookTimeSlot(timeSlotID int, resourceID int) int {
 	return bookingResponse.ID
 }
 
-func (sched *Schedule) BookIfPossible(day string, time string) *string {
+func (sched *Schedule) BookIfPossible(day string, time string, description string) *string {
 	if sched.renderedData == nil {
 		sched.RenderSchedule()
 	}
@@ -194,7 +194,7 @@ func (sched *Schedule) BookIfPossible(day string, time string) *string {
 			if dayCell.Day == day {
 				for _, timeCell := range dayCell.Cells {
 					if timeCell.Time == time && timeCell.Booked == false {
-						ret := sched.bookTimeSlot(timeCell.ID, resource.ID)
+						ret := sched.bookTimeSlot(timeCell.ID, resource.ID, description)
 						if ret == -1 {
 							return nil
 						}

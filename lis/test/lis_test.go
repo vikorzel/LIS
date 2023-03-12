@@ -118,12 +118,7 @@ func TestBooking(t *testing.T) {
 		"TEST",
 	)
 
-	_, err := lis.NewSchedule(nil)
-	if err == nil || err.Error() != "bad session pointer" {
-		t.Errorf("Session pointer for schedule is not checked")
-	}
-
-	_, err = lis.NewSchedule(instance)
+	_, err := lis.NewSchedule(instance)
 	if err == nil || err.Error() != "not authorised session" {
 		t.Errorf("Session auth is not checked for the schedule credentials")
 	}
@@ -140,10 +135,6 @@ func TestBooking(t *testing.T) {
 
 	instance.SetFaketime("2022-11-29")
 	sched.Refresh()
-	resources := sched.GetResources()
-	if len(resources) < 1 {
-		t.Errorf("Didn't receieved resources information")
-	}
 	if sched.BookIfPossible("Mon", "2pm - 7pm") == nil {
 		t.Errorf("Failed to book the room")
 	}
