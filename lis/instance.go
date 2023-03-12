@@ -101,6 +101,36 @@ func Get(inst *instance, handler string) (int, *http.Response, error) {
 
 }
 
+func Post(inst *instance, handler string, payload *[]byte) (int, *http.Response, error) {
+	log.Printf("Try to post %s handler", handler)
+	inst.initClient()
+	var req *http.Request
+	var err error
+	var reader *bytes.Reader = nil
+	if payload != nil {
+		reader = bytes.NewReader(*payload)
+	}
+	req, err = http.NewRequest(
+		"POST",
+		fmt.Sprintf("%s/%s", inst.endpoint, handler),
+		reader,
+	)
+	if err != nil {
+		log.Printf("error with request building: %s", err.Error())
+		return 0, nil, err
+	}
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.36")
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := inst.http_cli.Do(req)
+	if err != nil {
+		log.Printf("error with request sending: %s", err.Error())
+		return 0, nil, err
+	}
+	return resp.StatusCode, resp, err
+
+}
+
 func getSessions(inst *instance) (int, error) {
 	code, _, err := Get(inst, "sessions")
 	return code, err
@@ -108,7 +138,7 @@ func getSessions(inst *instance) (int, error) {
 
 func postSessions(inst *instance) (int, *http.Response, error) {
 	inst.initClient()
-
+	log.Println("Post session try")
 	credentials := SessionRequest{
 		Groupname: inst.groupname,
 		Username:  inst.username,
@@ -125,6 +155,8 @@ func postSessions(inst *instance) (int, *http.Response, error) {
 		return 0, nil, err
 	}
 	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.36")
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("Content-Type", "application/json")
 	resp, err := inst.http_cli.Do(req)
 	if resp != nil {
 		return resp.StatusCode, resp, err
@@ -137,9 +169,12 @@ func (inst *instance) Authorise() error {
 	if code == 403 {
 		code, response, _ := postSessions(inst)
 		if code != 200 {
+			buf := make([]byte, response.ContentLength+1)
+			response.Body.Read(buf)
 			return fmt.Errorf(
-				"wrong credentials for %s",
+				"wrong credentials for %s: %s",
 				inst.username,
+				string(buf[:]),
 			)
 		}
 		body, err := ioutil.ReadAll(response.Body)

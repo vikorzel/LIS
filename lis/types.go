@@ -95,9 +95,23 @@ type BookingRequest struct {
 	Ical                 bool          `json:"ical"`
 }
 
+type BookingResponse struct {
+	BookingDate string `json:"booking_date"`
+	GroupID     int    `json:"group_id"`
+	ID          int    `json:"id"`
+	TimeSlotID  int    `json:"time_slot_id"`
+}
+
 type BookingTimeSlotRequest struct {
 	TimeSlotID  int    `json:"time_slot_id"`
 	BookingDate string `json:"booking_date"`
+}
+
+type BookingTimeSlotResponse struct {
+	BookingDate string `json:"booking_date"`
+	GroupID     int    `json:"group_id"`
+	ID          int    `json:"id"`
+	TimeSlotID  int    `json:"time_slot_id"`
 }
 
 type TimeSlot struct {
